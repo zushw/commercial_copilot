@@ -2,6 +2,7 @@ import { UserQuery } from "../../domain/entities/UserQuery";
 import { CopilotResponse } from "../../domain/entities/CopilotResponse";
 import { MessageBrokerPort } from "../ports/out/MessageBrokerPort";
 import { LlmPort } from "../ports/out/LlmPort";
+import { TaskNode } from "../dtos/ExecutionPlanDto";
 
 export class ProcessCopilotQueryUseCase {
     constructor(
@@ -16,7 +17,6 @@ export class ProcessCopilotQueryUseCase {
 
         const report = (data: any) => {
             if (onProgress) onProgress(JSON.stringify({ type: 'progress', ...data }));
-
         }
 
         try {
@@ -24,37 +24,41 @@ export class ProcessCopilotQueryUseCase {
             const plan = await this.llmPort.generateExecutionPlan(query.question);
             console.log(`[Use Case] Execution Plan:`, JSON.stringify(plan, null, 2));
 
-            let sqlQuery = '';
-            let queryResult: any[] = [];
-            let insights: string[] = [];
-            let finalAnswer = '';
+            const taskPromises: Record<string, Promise<TaskNode[]>> = {};
+            const taskResults: Record<string, any> = {};
 
-            const sqlTask = plan.find(t => t.worker === 'SQL_GEN');
-            const insightTask = plan.find(t => t.worker === 'INSIGHT');
-            const answerTask = plan.find(t => t.worker === 'ANSWER_COMPOSITION');
+            const executeTask = async (task: TaskNode) => {
+                if (task.depends_on && taskPromises[task.depends_on]) {
+                    await taskPromises[task.depends_on];
+                }
 
-            if (sqlTask) {
-                const result = await this.broker.request('WORKER:SQL_GEN', { question: query.question }, report);
-                sqlQuery = result.sqlQuery;
-                queryResult = result.data;
-            }
+                const payload: any = { question: query.question };
 
-            if (insightTask) {
-                insights = await this.broker.request('WORKER:INSIGHT', { 
-                    question: query.question, 
-                    data: queryResult 
-                }, report);
-            }
+                if (task.worker === 'INSIGHT' && taskResults['SQL_GEN']) {
+                    payload.data = taskResults['SQL_GEN'].data;
+                }
 
-            if (answerTask) {
-                finalAnswer = await this.broker.request('WORKER:ANSWER_COMPOSITION', { 
-                    question: query.question, 
-                    data: queryResult, 
-                    insights 
-                }, report);
-            }
-        
+                if (task.worker === 'ANSWER_COMPOSITION') {
+                    payload.data = taskResults['SQL_GEN']?.data || []
+                    payload.insight = taskResults['INSIGHT'] || []
+                }
+
+                const result = await this.broker.request(`WORKER:${task.worker}`, payload, report);
+                taskResults[task.worker] = result;
+                return result;
+            };
+
+            plan.forEach(task => {
+                taskPromises[task.worker] = executeTask(task);
+            });
+
+            await Promise.all(Object.values(taskPromises));
+
             const executionTimeMs = Date.now() - startTime;
+
+            const sqlQuery = taskResults['SQL_GEN']?.sqlQuery || '';
+            const insights = taskResults['INSIGHT'] || [];
+            const finalAnswer = taskResults['ANSWER_COMPOSITION'] || "Wasn't possible to generate the response.";
 
             return new CopilotResponse(finalAnswer, insights, sqlQuery, executionTimeMs);
         } catch (error: any) {

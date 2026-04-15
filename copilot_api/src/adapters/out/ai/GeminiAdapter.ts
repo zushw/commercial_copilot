@@ -110,8 +110,8 @@ export class GeminiAdapter implements LlmPort {
             generationConfig: { temperature: 0.5 }
         });
     
-        const dataString = JSON.stringify(data).substring(0, 1500);
-        const insightsString = insights.join(', ');
+        const dataString = JSON.stringify(data || []).substring(0, 1500);
+        const insightsString = (insights || []).join(', ');
 
         const prompt = `You are a helpful Commercial Copilot assistant for portfolio managers.
         Based on the user's question, the database results, and the generated insights, write a clear, professional, and direct answer.
