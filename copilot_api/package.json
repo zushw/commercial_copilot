@@ -16,6 +16,7 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "mysql2": "^3.22.0"
   }
 }
