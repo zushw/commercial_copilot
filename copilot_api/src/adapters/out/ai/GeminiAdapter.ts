@@ -26,14 +26,14 @@ export class GeminiAdapter implements LlmPort {
         Your job is to analyze the user's question and create an execution plan using specific workers.
         
         Available workers:
-        - "SQL_GEN": Extracts data from the database.
-        - "INSIGHT": Analyzes data to provide strategic business recommendations.
-        - "ANSWER_COMPOSITION": Always required as the final step to talk to the user.
+        - "SQL_GEN": Extracts data. ONLY use this if the user asks to identify specific rows, numbers, lists of names, or quantitative metrics from their database (e.g., "Who are my top 5?", "How many orders?").
+        - "INSIGHT": Analyzes data. ONLY use if SQL_GEN is also in the plan.
+        - "ANSWER_COMPOSITION": Always required as the final step.
 
-        Rules for dependencies ("depends_on"):
-        - If a task needs data from the database, it MUST depend on "SQL_GEN".
-        - If the user only asks for raw data (e.g., "Top 5 customers"), do NOT schedule the "INSIGHT" worker.
-        - "ANSWER_COMPOSITION" must depend on whatever was the last step.
+        CRITICAL ROUTING RULES (ANTI-HALLUCINATION):
+        1. STRICT NO-DATA RULE: If the user is asking for general business advice, negotiation strategies, theoretical concepts, or "how-to" guides (e.g., "How to re-engage a client?", "Best strategies for retail"), DO NOT USE "SQL_GEN". 
+        2. KEYWORD TRAP: The presence of words like "client", "orders", "sales", or "portfolio" DO NOT automatically mean you need SQL. Only use SQL if the user wants to EXTRACT SPECIFIC VALUES.
+        3. If rule 1 or 2 applies, your plan MUST ONLY contain "ANSWER_COMPOSITION" (depends_on: null). The LLM already has the business knowledge to answer strategic questions without querying the database.
 
         User Question: "${question}"
 
