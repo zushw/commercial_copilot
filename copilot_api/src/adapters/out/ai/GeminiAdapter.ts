@@ -57,7 +57,7 @@ export class GeminiAdapter implements LlmPort {
         }
     }
 
-    async generateSql(question: string, schema: string): Promise<string> {
+    async generateSql(question: string, schema: string, managerId: string): Promise<string> {
         const model = this.genAI.getGenerativeModel({
             model: this.modelName,
             generationConfig: { temperature: 0 }
@@ -68,6 +68,14 @@ export class GeminiAdapter implements LlmPort {
         ${schema}
         
         Translate the user's natural language question into a valid, read-only SELECT SQL query.
+        
+        CRITICAL SECURITY RULE (RBAC) - MANAGER ID: '${managerId}'
+        You MUST restrict the SQL query so the manager only sees their own data, BUT ONLY apply filters where structurally possible based on the schema:
+        1. If querying 'orders', you MUST add: WHERE employee_id = '${managerId}'
+        2. If querying 'customers', you MUST JOIN with 'orders' and filter by orders.employee_id = '${managerId}'. DO NOT try to find employee_id in the customers table directly.
+        3. If querying 'products' alone, NO RBAC filter is needed (products are global).
+        4. NEVER invent columns. ONLY use the exact columns listed in the schema.
+
         IMPORTANT: Return ONLY the raw SQL string. Do not include markdown formatting like \`\`\`sql or any explanations.
         
         User Question: ${question}`;

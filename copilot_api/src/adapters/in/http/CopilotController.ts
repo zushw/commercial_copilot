@@ -7,14 +7,15 @@ export class CopilotController {
 
     public handleAskQuestion = async (req: Request, res: Response): Promise<void> => {
         try {
-            const { question, portfolioManagerId } = req.body;
+            const managerId = req.user?.managerId;
+            const { question } = req.body;
 
-            if (!question || !portfolioManagerId) {
-                res.status(400).json({ error: 'Missing required fields: question, portfolioManagerId' });
+            if (!question || !managerId) {
+                res.status(400).json({ error: 'Missing required fields or unauthenticated' });
                 return;
             }
 
-            const userQuery = new UserQuery(question, portfolioManagerId);
+            const userQuery = new UserQuery(question, managerId);
 
             if (!userQuery.isValid()) {
                 res.status(400).json({ error: 'Invalid query parameters' });

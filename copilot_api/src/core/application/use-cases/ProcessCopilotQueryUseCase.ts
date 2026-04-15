@@ -32,7 +32,7 @@ export class ProcessCopilotQueryUseCase {
                     await taskPromises[task.depends_on];
                 }
 
-                const payload: any = { question: query.question };
+                const payload: any = { question: query.question, managerId: query.portfolioManagerId };
 
                 if (task.worker === 'INSIGHT' && taskResults['SQL_GEN']) {
                     payload.data = taskResults['SQL_GEN'].data;

@@ -6,6 +6,7 @@ import { ProcessCopilotQueryUseCase } from '../core/application/use-cases/Proces
 import { CopilotController } from '../adapters/in/http/CopilotController';
 import { InMemoryMessageBroker } from '../adapters/out/messaging/InMemoryMessageBroker';
 import { CopilotWorkers } from '../adapters/in/workers/CopilotWorkers';
+import { AuthMiddleware } from '../adapters/in/http/AuthMiddleware';
 
 async function bootstrap() {
   console.log('Starting Commercial Copilot API...');
@@ -24,7 +25,7 @@ async function bootstrap() {
   const app = express();
   app.use(express.json());
 
-  app.post('/api/v1/copilot/ask', copilotController.handleAskQuestion);
+  app.post('/api/v1/copilot/ask', AuthMiddleware.requireManagerRole, copilotController.handleAskQuestion);
 
   app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 

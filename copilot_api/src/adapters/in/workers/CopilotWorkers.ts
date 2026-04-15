@@ -12,12 +12,12 @@ export class CopilotWorkers {
     public startListening(): void {
         console.log("Workers are starting to listen to queues...");
 
-        this.broker.subscribe('WORKER:SQL_GEN', async ({ question }, progress) => {
+        this.broker.subscribe('WORKER:SQL_GEN', async ({ question, managerId }, progress) => {
             console.log(`[Worker:SQL_GEN] Processing data extraction for: "${question}"`);
             progress({ step: 'sql', status: 'Starting data interpretation...' });
             const schema = await this.dbPort.getSchemaDefinition();
             progress({ step: 'sql', status: 'Generating SQL query...' });
-            const sqlQuery = await this.llmPort.generateSql(question, schema);
+            const sqlQuery = await this.llmPort.generateSql(question, schema, managerId);
             progress({ step: 'sql', status: 'Accessing database...' });
             const data = await this.dbPort.executeReadQuery(sqlQuery);
             return { sqlQuery, data };
