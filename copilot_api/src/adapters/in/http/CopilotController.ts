@@ -21,19 +21,23 @@ export class CopilotController {
                 return;
             }
 
-            const response = await this.processCopilotQueryUseCase.execute(userQuery);
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders();
 
-            res.status(200).json({
-                success: true,
-                data: response
-            });
+            const onProgress = (message: string) => {
+                res.write(`data: ${message}\n\n`);
+            }
+
+            const response = await this.processCopilotQueryUseCase.execute(userQuery, onProgress);
+
+            res.write(`data: ${JSON.stringify({ type: 'done', data: response })}\n\n`);
+            res.end();
         } catch (error: any) {
             console.error('[CopilotController] Error processing request:', error);
-
-            res.status(500).json({
-                success: false,
-                error: error.message || 'Internal server error while processing your request.'
-            });
+            res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+            res.end();
         }
     };
 }

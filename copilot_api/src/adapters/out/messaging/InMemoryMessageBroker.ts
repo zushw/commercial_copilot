@@ -10,13 +10,18 @@ export class InMemoryMessageBroker implements MessageBrokerPort {
         this.bus.emit(topic, payload);
     }
 
-    subscribe(topic: string, handler: (payload: any) => Promise<any>): void {
+    subscribe(topic: string, handler: (payload: any, progress: ( data: any) => void) => Promise<any>): void {
         this.bus.on(topic, async (data) => {
             const payload = data?.payload || data;
             const replyTo = data?.replyTo;
+            const progressTopic = data?.progressTopic;
+
+            const reportProgress = (progressData: any) => {
+                if (progressTopic) this.bus.emit(progressTopic, progressData);
+            };
 
             try {
-                const result = await handler(payload)
+                const result = await handler(payload, reportProgress)
 
                 if (replyTo) {
                     this.bus.emit(replyTo, { success: true, result });
@@ -30,16 +35,22 @@ export class InMemoryMessageBroker implements MessageBrokerPort {
         });
     }
 
-    request(topic: string, payload: any): Promise<any> {
+    request(topic: string, payload: any, onProgress?: (data: any) => void): Promise<any> {
         return new Promise((resolve, reject) => {
             const replyTo = `reply_${randomUUID}`;
+            const progressTopic = `progress_${randomUUID()}`;
+
+            if (onProgress) {
+                this.bus.on(progressTopic, onProgress);
+            }
 
             this.bus.once(replyTo, (response) => {
+                this.bus.removeAllListeners(progressTopic);
                 if (response.success) resolve(response.result);
                 else reject(new Error(response.result));
             });
 
-            this.bus.emit(topic, { payload, replyTo });
+            this.bus.emit(topic, { payload, replyTo, progressTopic });
         });
     }
 }
