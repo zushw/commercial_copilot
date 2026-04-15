@@ -7,12 +7,14 @@ import { CopilotController } from '../adapters/in/http/CopilotController';
 import { InMemoryMessageBroker } from '../adapters/out/messaging/InMemoryMessageBroker';
 import { CopilotWorkers } from '../adapters/in/workers/CopilotWorkers';
 import { AuthMiddleware } from '../adapters/in/http/AuthMiddleware';
+import { GroqAdapter } from '../adapters/out/ai/GroqAdapter';
 
 async function bootstrap() {
   console.log('Starting Commercial Copilot API...');
 
   const dbAdapter = new MysqlDatabaseAdapter();
-  const aiAdapter = new GeminiAdapter();
+  // const aiAdapter = new GeminiAdapter();
+  const aiAdapter = new GroqAdapter();
   const broker = new InMemoryMessageBroker();
 
   const workers = new CopilotWorkers(broker, dbAdapter, aiAdapter);
