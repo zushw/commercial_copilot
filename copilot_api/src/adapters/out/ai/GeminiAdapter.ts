@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { LlmPort } from "../../../core/application/ports/out/LlmPort";
+import { ExecutionPlan } from "../../../core/application/dtos/ExecutionPlanDto";
 
 export class GeminiAdapter implements LlmPort {
     private genAI: GoogleGenerativeAI;
@@ -13,6 +14,47 @@ export class GeminiAdapter implements LlmPort {
         }
 
         this.genAI = new GoogleGenerativeAI(apiKey)
+    }
+
+    async generateExecutionPlan(question: string): Promise<ExecutionPlan> {
+        const model = this.genAI.getGenerativeModel({
+            model: this.modelName,
+            generationConfig: { temperature:0, responseMimeType: "application/json"}
+        });
+
+        const prompt = `You are the AI Orchestrator for a financial copilot.
+        Your job is to analyze the user's question and create an execution plan using specific workers.
+        
+        Available workers:
+        - "SQL_GEN": Extracts data from the database.
+        - "INSIGHT": Analyzes data to provide strategic business recommendations.
+        - "ANSWER_COMPOSITION": Always required as the final step to talk to the user.
+
+        Rules for dependencies ("depends_on"):
+        - If a task needs data from the database, it MUST depend on "SQL_GEN".
+        - If the user only asks for raw data (e.g., "Top 5 customers"), do NOT schedule the "INSIGHT" worker.
+        - "ANSWER_COMPOSITION" must depend on whatever was the last step.
+
+        User Question: "${question}"
+
+        Respond ONLY with a valid JSON array matching this exact structure:
+        [
+        { "worker": "WORKER_NAME", "depends_on": null | "OTHER_WORKER_NAME", "task": "Description of what to do" }
+        ]`;
+
+        const result = await model.generateContent(prompt);
+
+        try {
+            const planText = result.response.text().trim();
+            const plan = JSON.parse(planText) as ExecutionPlan;
+            return plan;
+        } catch (error) {
+            console.error('[GeminiAdapter] Failed to parse execution plan:', result.response.text());
+            return [
+                { worker: 'SQL_GEN', depends_on: null, task: 'Extract data safely' },
+                { worker: 'ANSWER_COMPOSITION', depends_on: 'SQL_GEN', task: 'Formulate final answer' }
+            ];
+        }
     }
 
     async generateSql(question: string, schema: string): Promise<string> {
