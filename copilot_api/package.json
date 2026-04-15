@@ -10,8 +10,12 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/mysql": "^2.15.27",
     "@types/node": "^25.6.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "mysql2": "^3.22.0"
   }
 }
