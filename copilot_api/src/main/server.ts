@@ -4,14 +4,20 @@ import { MysqlDatabaseAdapter } from '../adapters/out/persistence/MysqlDatabaseA
 import { GeminiAdapter } from '../adapters/out/ai/GeminiAdapter';
 import { ProcessCopilotQueryUseCase } from '../core/application/use-cases/ProcessCopilotQueryUseCase';
 import { CopilotController } from '../adapters/in/http/CopilotController';
+import { InMemoryMessageBroker } from '../adapters/out/messaging/InMemoryMessageBroker';
+import { CopilotWorkers } from '../adapters/in/workers/CopilotWorkers';
 
 async function bootstrap() {
   console.log('Starting Commercial Copilot API...');
 
   const dbAdapter = new MysqlDatabaseAdapter();
   const aiAdapter = new GeminiAdapter();
+  const broker = new InMemoryMessageBroker();
 
-  const useCase = new ProcessCopilotQueryUseCase(dbAdapter, aiAdapter);
+  const workers = new CopilotWorkers(broker, dbAdapter, aiAdapter);
+  workers.startListening();
+
+  const useCase = new ProcessCopilotQueryUseCase(broker, aiAdapter);
 
   const copilotController = new CopilotController(useCase);
 

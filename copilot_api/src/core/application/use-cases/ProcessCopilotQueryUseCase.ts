@@ -1,11 +1,11 @@
 import { UserQuery } from "../../domain/entities/UserQuery";
 import { CopilotResponse } from "../../domain/entities/CopilotResponse";
-import { DatabasePort } from "../ports/out/DatabasePort";
+import { MessageBrokerPort } from "../ports/out/MessageBrokerPort";
 import { LlmPort } from "../ports/out/LlmPort";
 
 export class ProcessCopilotQueryUseCase {
     constructor(
-        private readonly dbPort: DatabasePort,
+        private readonly broker: MessageBrokerPort,
         private readonly llmPort: LlmPort
     ) {}
 
@@ -28,20 +28,24 @@ export class ProcessCopilotQueryUseCase {
             const answerTask = plan.find(t => t.worker === 'ANSWER_COMPOSITION');
 
             if (sqlTask) {
-                console.log(`[Worker Sim] Running SQL_GEN: ${sqlTask.task}`);
-                const schema = await this.dbPort.getSchemaDefinition();
-                sqlQuery = await this.llmPort.generateSql(query.question, schema);
-                queryResult = await this.dbPort.executeReadQuery(sqlQuery);
+                const result = await this.broker.request('WORKER:SQL_GEN', { question: query.question });
+                sqlQuery = result.sqlQuery;
+                queryResult = result.data;
             }
 
             if (insightTask) {
-                console.log(`[Worker Sim] Running INSIGHT: ${insightTask.task}`);
-                insights = await this.llmPort.generateInsights(query.question, queryResult);
+                insights = await this.broker.request('WORKER:INSIGHT', { 
+                question: query.question, 
+                data: queryResult 
+                });
             }
 
             if (answerTask) {
-                console.log(`[Worker Sim] Running ANSWER_COMPOSITION: ${answerTask.task}`);
-                finalAnswer = await this.llmPort.generateFinalAnswer(query.question, queryResult, insights);
+                finalAnswer = await this.broker.request('WORKER:ANSWER_COMPOSITION', { 
+                question: query.question, 
+                data: queryResult, 
+                insights 
+                });
             }
         
             const executionTimeMs = Date.now() - startTime;
