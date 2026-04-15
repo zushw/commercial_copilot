@@ -1,0 +1,17 @@
+{
+  "name": "commercial_copilot",
+  "version": "1.0.0",
+  "description": "This project is a technical solution for a **Commercial Copilot** designed for portfolio managers in a financial institution. The system aims to provide real-time insights, performance analysis, and decision-making support for merchant data.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}
