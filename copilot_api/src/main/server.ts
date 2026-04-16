@@ -8,6 +8,7 @@ import { InMemoryMessageBroker } from '../adapters/out/messaging/InMemoryMessage
 import { CopilotWorkers } from '../adapters/in/workers/CopilotWorkers';
 import { AuthMiddleware } from '../adapters/in/http/AuthMiddleware';
 import { GroqAdapter } from '../adapters/out/ai/GroqAdapter';
+import { RedisAdapter } from '../adapters/out/cache/RedisAdapter';
 
 async function bootstrap() {
   console.log('Starting Commercial Copilot API...');
@@ -17,10 +18,13 @@ async function bootstrap() {
   const aiAdapter = new GroqAdapter();
   const broker = new InMemoryMessageBroker();
 
+  const redisAdapter = new RedisAdapter();
+  await redisAdapter.connect();
+
   const workers = new CopilotWorkers(broker, dbAdapter, aiAdapter);
   workers.startListening();
 
-  const useCase = new ProcessCopilotQueryUseCase(broker, aiAdapter);
+  const useCase = new ProcessCopilotQueryUseCase(broker, aiAdapter, redisAdapter);
 
   const copilotController = new CopilotController(useCase);
 

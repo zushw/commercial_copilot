@@ -3,11 +3,13 @@ import { CopilotResponse } from "../../domain/entities/CopilotResponse";
 import { MessageBrokerPort } from "../ports/out/MessageBrokerPort";
 import { LlmPort } from "../ports/out/LlmPort";
 import { TaskNode } from "../dtos/ExecutionPlanDto";
+import { CachePort } from "../ports/out/CachePort";
 
 export class ProcessCopilotQueryUseCase {
     constructor(
         private readonly broker: MessageBrokerPort,
-        private readonly llmPort: LlmPort
+        private readonly llmPort: LlmPort,
+        private readonly cachePort: CachePort
     ) {}
 
     async execute(query: UserQuery, onProgress?: (msg: string) => void): Promise<CopilotResponse> {
@@ -20,6 +22,16 @@ export class ProcessCopilotQueryUseCase {
         }
 
         try {
+            const normalizedQuestion = query.question.toLowerCase().trim().replace(/\s+/g, ' ');
+            const cacheKey = `copilot:query:${query.portfolioManagerId}:${Buffer.from(normalizedQuestion).toString('base64')}`;
+
+            const cachedData = await this.cachePort.get(cacheKey);
+            if (cachedData) {
+                report({ step: 'cache', status: 'Response retrieved from cache instantly!' });
+                const parsedData = JSON.parse(cachedData);
+                return new CopilotResponse(parsedData.answer, parsedData.insights, parsedData.generatedSql, Date.now() - startTime);
+            }
+
             report({ status: 'Analyzing the question intent...' });
             const plan = await this.llmPort.generateExecutionPlan(query.question);
             console.log(`[Use Case] Execution Plan:`, JSON.stringify(plan, null, 2));
@@ -60,7 +72,12 @@ export class ProcessCopilotQueryUseCase {
             const insights = taskResults['INSIGHT'] || [];
             const finalAnswer = taskResults['ANSWER_COMPOSITION'] || "Wasn't possible to generate the response.";
 
-            return new CopilotResponse(finalAnswer, insights, sqlQuery, executionTimeMs);
+            const finalResponse = new CopilotResponse(finalAnswer, insights, sqlQuery, executionTimeMs);
+
+            await this.cachePort.set(cacheKey, JSON.stringify(finalResponse), 3600);
+
+            return finalResponse;
+            
         } catch (error: any) {
             console.error('[ProcessCopilotQueryUseCase] Error executing query:', error);
             throw new Error(`Failed to process copilot query: ${error.message}`);
