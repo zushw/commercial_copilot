@@ -27,9 +27,13 @@ export class ProcessCopilotQueryUseCase {
 
             const cachedData = await this.cachePort.get(cacheKey);
             if (cachedData) {
-                report({ step: 'cache', status: 'Response retrieved from cache instantly!' });
-                const parsedData = JSON.parse(cachedData);
-                return new CopilotResponse(parsedData.answer, parsedData.insights, parsedData.generatedSql, Date.now() - startTime);
+                try{
+                    const parsedData = JSON.parse(cachedData);
+                    report({ step: 'cache', status: 'Response retrieved from cache instantly!' });
+                    return new CopilotResponse(parsedData.answer, parsedData.insights, parsedData.generatedSql, Date.now() - startTime);
+                } catch (error: any) {
+                    console.warn('[ProcessCopilotQueryUseCase] Error on cache:', error)
+                }
             }
 
             report({ status: 'Analyzing the question intent...' });
@@ -74,10 +78,14 @@ export class ProcessCopilotQueryUseCase {
 
             const finalResponse = new CopilotResponse(finalAnswer, insights, sqlQuery, executionTimeMs);
 
-            await this.cachePort.set(cacheKey, JSON.stringify(finalResponse), 3600);
+            try {
+                await this.cachePort.set(cacheKey, JSON.stringify(finalResponse), 3600);
+            } catch (err) {
+                console.warn("[ProcessCopilotQueryUseCase] Failed to write to cache:", err);
+            }
 
             return finalResponse;
-            
+
         } catch (error: any) {
             console.error('[ProcessCopilotQueryUseCase] Error executing query:', error);
             throw new Error(`Failed to process copilot query: ${error.message}`);
